@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-commerce Product Page with Image Magnifier</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* --- Magnifier Styles --- */
+        .img-zoom-container {
+            position: relative;
+            cursor: zoom-in;
+        }
+
+        #magnifier-lens {
+            position: absolute;
+            border: 2px solid #4f46e5;
+            width: 150px; /* Size of the lens */
+            height: 150px;
+            background-color: rgba(255, 255, 255, 0.2);
+            pointer-events: none;
+            border-radius: 50%; /* Circular lens */
+            display: none; /* Hidden by default */
+        }
+
+        #zoom-result {
+            position: absolute;
+            border: 1px solid #d1d5db;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: calc(100% + 16px);
+            background-repeat: no-repeat;
+            pointer-events: none;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-radius: 0.75rem;
+            display: none; /* Hidden by default */
+        }
+        
+        @media (max-width: 1024px) {
+            #zoom-result {
+                display: none !important;
+            }
+            .img-zoom-container {
+                cursor: pointer;
+            }
+        }
+
+        /* --- Tooltip Styles --- */
+        #cursor-tooltip {
+            position: fixed;
+            display: none; 
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            background-color: rgba(17, 24, 39, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(4px);
+            text-align: center;
+        }
+
+        #cursor-tooltip.visible {
+            display: block;
+            opacity: 1;
+        }
+
+        /* --- Lightbox/Modal Styles --- */
+        #lightbox {
+            position: fixed;
+            z-index: 2000;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        #lightbox.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        #lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 0.5rem;
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+        }
+        
+        /* --- Tab Styles --- */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tab-btn.active {
+            border-color: #4f46e5;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+    <!-- Header/Navbar -->
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <a href="#" class="text-2xl font-bold text-gray-900">Time<span class="text-indigo-600">piece</span></a>
+                <nav class="hidden md:flex space-x-8 text-gray-600">
+                    <a href="#" class="hover:text-indigo-600 transition-colors">Home</a>
+                    <a href="#" class="hover:text-indigo-600 transition-colors">Watches</a>
+                    <a href="#" class="hover:text-indigo-600 transition-colors">About Us</a>
+                    <a href="#" class="hover:text-indigo-600 transition-colors">Contact</a>
+                </nav>
+                <div class="flex items-center space-x-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-500 hover:text-indigo-600 cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-500 hover:text-indigo-600 cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4 lg:px-8 lg:py-12">
+        <main class="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+                <!-- Product Image Section -->
+                <div class="flex flex-col items-center">
+                    <div class="relative w-full">
+                         <div class="img-zoom-container rounded-lg overflow-hidden relative">
+                             <img id="product-img" src="images/watch-main.jpg" alt="Titan Edge Ceramic Watch" class="w-full h-auto object-cover">
+                             <div id="magnifier-lens"></div>
+                         </div>
+                         <div id="zoom-result"></div>
+                    </div>
+                   
+                    <div id="thumbnail-gallery" class="flex space-x-4 mt-4">
+                        <img src="images/watch-main.jpg" alt="Watch Front View" data-large-src="images/watch-main.jpg" class="w-20 h-20 object-cover rounded-md cursor-pointer border-2 border-indigo-500 shadow-md">
+                        <img src="images/watch-side.jpg" alt="Watch Side View" data-large-src="images/watch-side.jpg" class="w-20 h-20 object-cover rounded-md cursor-pointer border-2 border-transparent hover:border-indigo-500">
+                        <img src="images/watch-strap.jpg" alt="Watch Strap Detail" data-large-src="images/watch-strap.jpg" class="w-20 h-20 object-cover rounded-md cursor-pointer border-2 border-transparent hover:border-indigo-500">
+                    </div>
+                </div>
+
+                <!-- Product Details Section -->
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Titan Edge Ceramic</h1>
+                    <p class="text-indigo-600 font-semibold my-3">Model T-Edge</p>
+                    <p class="text-3xl font-light text-gray-800 my-4">₹ 24,999</p>
+                    <p class="text-gray-600 leading-relaxed mb-6">
+                        Discover ultra-slim sophistication with the Titan Edge Ceramic. Crafted with a high-tech ceramic case and bracelet, this timepiece offers exceptional scratch resistance and a lightweight feel. A sapphire crystal dial window and precision quartz movement ensure lasting clarity and accurate timekeeping.
+                    </p>
+                    <button class="w-full bg-indigo-600 text-white font-bold py-4 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">
+                        Add to Cart
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Tabs Section -->
+            <div class="mt-12 border-t pt-8">
+                <div class="flex border-b mb-6">
+                    <button class="tab-btn active py-2 px-4 border-b-2" data-tab="specifications">Specifications</button>
+                    <button class="tab-btn py-2 px-4 border-b-2 border-transparent text-gray-500" data-tab="reviews">Reviews</button>
+                    <button class="tab-btn py-2 px-4 border-b-2 border-transparent text-gray-500" data-tab="shipping">Shipping & Returns</button>
+                </div>
+                <div id="specifications" class="tab-content active text-gray-600 leading-relaxed">
+                    <ul class="list-disc list-inside space-y-2">
+                        <li><strong>Case Material:</strong> High-Tech Ceramic</li>
+                        <li><strong>Bracelet Material:</strong> High-Tech Ceramic</li>
+                        <li><strong>Crystal:</strong> Sapphire Crystal</li>
+                        <li><strong>Movement:</strong> Precision Quartz</li>
+                        <li><strong>Water Resistance:</strong> 3 ATM (30 meters)</li>
+                        <li><strong>Case Diameter:</strong> 42mm</li>
+                        <li><strong>Case Thickness:</strong> 5.2mm (Ultra-Slim)</li>
+                    </ul>
+                </div>
+                <div id="reviews" class="tab-content text-gray-600">
+                    <p>No reviews yet. Be the first to review this product!</p>
+                </div>
+                <div id="shipping" class="tab-content text-gray-600 leading-relaxed">
+                    <p><strong>Standard Shipping:</strong> 5-7 business days. Free on all orders.</p>
+                    <p><strong>Express Shipping:</strong> 2-3 business days. Additional charges apply.</p>
+                    <p><strong>Returns:</strong> We offer a 30-day return policy on all unworn items. Please visit our returns page for more information.</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-12">
+        <div class="container mx-auto px-4 lg:px-8 py-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-lg font-semibold">About Timepiece</h3>
+                    <p class="mt-2 text-gray-400">Curating the world's finest watches with a passion for craftsmanship and elegance.</p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold">Quick Links</h3>
+                    <ul class="mt-2 space-y-1 text-gray-400">
+                        <li><a href="#" class="hover:text-white">Home</a></li>
+                        <li><a href="#" class="hover:text-white">Our Collection</a></li>
+                        <li><a href="#" class="hover:text-white">FAQs</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold">Follow Us</h3>
+                    <div class="flex space-x-4 mt-2">
+                         <a href="#" class="text-gray-400 hover:text-white">...</a> <!-- Placeholder for social icons -->
+                    </div>
+                </div>
+            </div>
+            <div class="text-center text-gray-500 border-t border-gray-700 mt-8 pt-6">
+                &copy; 2025 Timepiece. All Rights Reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Help Icon -->
+    <div 
+        class="tooltip-trigger fixed bottom-6 right-6 h-14 w-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-2xl cursor-pointer transform transition-transform duration-200 hover:scale-110"
+        data-tooltip-content="Monish Sampat<br>IA-1 UI-UX<br>16014123031"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    </div>
+
+    <!-- Tooltip Element -->
+    <div id="cursor-tooltip"></div>
+
+    <!-- Lightbox Element -->
+    <div id="lightbox">
+        <img id="lightbox-img" src="" alt="Zoomed product image">
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- Microinteraction 1: Image Magnifier & Lightbox ---
+        function imageZoom(imgID, resultID) {
+            const img = document.getElementById(imgID);
+            const result = document.getElementById(resultID);
+            const lens = document.getElementById('magnifier-lens');
+            let zoomLevel = 2;
+
+            if (!img || !result || !lens) return;
+
+            const updateZoom = () => {
+                result.style.backgroundImage = "url('" + img.src + "')";
+                result.style.backgroundSize = (img.width * zoomLevel) + "px " + (img.height * zoomLevel) + "px";
+            };
+            
+            img.onload = updateZoom;
+            if (img.complete) updateZoom();
+
+            const moveLens = (e) => {
+                e.preventDefault();
+                const pos = getCursorPos(e);
+                let x = pos.x - (lens.offsetWidth / 2);
+                let y = pos.y - (lens.offsetHeight / 2);
+
+                if (x > img.width - lens.offsetWidth) { x = img.width - lens.offsetWidth; }
+                if (x < 0) { x = 0; }
+                if (y > img.height - lens.offsetHeight) { y = img.height - lens.offsetHeight; }
+                if (y < 0) { y = 0; }
+
+                lens.style.left = x + "px";
+                lens.style.top = y + "px";
+                result.style.backgroundPosition = "-" + (x * zoomLevel) + "px -" + (y * zoomLevel) + "px";
+            };
+
+            const getCursorPos = (e) => {
+                const a = img.getBoundingClientRect();
+                let x = e.pageX - a.left - window.pageXOffset;
+                let y = e.pageY - a.top - window.pageYOffset;
+                return { x: x, y: y };
+            };
+            
+            const changeZoom = (e) => {
+                e.preventDefault();
+                if(e.deltaY < 0){ zoomLevel += 0.2; } else { zoomLevel -= 0.2; }
+                if (zoomLevel < 1.5) zoomLevel = 1.5;
+                if (zoomLevel > 5.0) zoomLevel = 5.0;
+                updateZoom();
+            };
+
+            const container = img.parentElement;
+            container.addEventListener("mousemove", moveLens);
+            container.addEventListener("wheel", changeZoom);
+            container.addEventListener("mouseenter", () => {
+                lens.style.display = "block";
+                result.style.display = "block";
+            });
+            container.addEventListener("mouseleave", () => {
+                lens.style.display = "none";
+                result.style.display = "none";
+            });
+        }
+        
+        imageZoom("product-img", "zoom-result");
+
+        const thumbnails = document.querySelectorAll("#thumbnail-gallery img");
+        const mainImage = document.getElementById("product-img");
+        
+        thumbnails.forEach(thumb => {
+            thumb.addEventListener("click", () => {
+                const newSrc = thumb.dataset.largeSrc;
+                if (newSrc) mainImage.src = newSrc;
+                thumbnails.forEach(t => t.classList.remove('border-indigo-500', 'shadow-md'));
+                thumb.classList.add('border-indigo-500', 'shadow-md');
+            });
+        });
+
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        mainImage.parentElement.addEventListener('click', () => {
+            lightboxImg.src = mainImage.src;
+            lightbox.classList.add('visible');
+        });
+        lightbox.addEventListener('click', () => {
+            lightbox.classList.remove('visible');
+        });
+
+
+        // --- Microinteraction 2: Help Icon Tooltip ---
+        const tooltip = document.getElementById('cursor-tooltip');
+        const tooltipTriggers = document.querySelectorAll('.tooltip-trigger');
+
+        if (tooltip && tooltipTriggers.length) {
+            const moveTooltip = (e) => {
+                const tooltipRect = tooltip.getBoundingClientRect();
+                let newLeft = e.clientX + 15;
+                let newTop = e.clientY + 15;
+                if (newLeft + tooltipRect.width > window.innerWidth) {
+                    newLeft = e.clientX - tooltipRect.width - 15;
+                }
+                if (newTop + tooltipRect.height > window.innerHeight) {
+                    newTop = e.clientY - tooltipRect.height - 15;
+                }
+                tooltip.style.left = `${newLeft}px`;
+                tooltip.style.top = `${newTop}px`;
+            };
+
+            const showTooltip = (content) => {
+                tooltip.innerHTML = content;
+                tooltip.classList.add('visible');
+                document.addEventListener('mousemove', moveTooltip);
+            };
+
+            const hideTooltip = () => {
+                tooltip.classList.remove('visible');
+                document.removeEventListener('mousemove', moveTooltip);
+            };
+
+            tooltipTriggers.forEach(trigger => {
+                trigger.addEventListener('mouseenter', () => showTooltip(trigger.dataset.tooltipContent));
+                trigger.addEventListener('mouseleave', hideTooltip);
+            });
+        }
+
+        // --- New: Tab Functionality ---
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                const tabId = button.dataset.tab;
+                tabContents.forEach(content => {
+                    if (content.id === tabId) {
+                        content.classList.add('active');
+                    } else {
+                        content.classList.remove('active');
+                    }
+                });
+            });
+        });
+    });
+    </script>
+</body>
+</html>
+
